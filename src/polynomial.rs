@@ -71,11 +71,12 @@ impl<const N: usize, const A: u64> Polynomial<N, A> {
         Self { inner }
     }
 
-    pub fn from_int(int: u64) -> Self {
+    pub fn from_int_scaled(int: u64, delta: i64) -> Self {
         let inner: [Element<A>; N] = (0..N)
             .map(|i| {
                 if i < u16::BITS as usize {
-                    Element::<A>::new(((int >> i) & 1) as i64)
+                    // multiply bit by Δ before lifting into Z_q
+                    Element::<A>::new(((int >> i) & 1) as i64 * delta)
                 } else {
                     Element::<A>::new(0)
                 }
@@ -110,6 +111,14 @@ impl<const N: usize, const A: u64> Polynomial<N, A> {
         Self::new(core::array::from_fn(|_| {
             let r: i8 = rng.random_range(-1..=1);
             Element::new(r as i64)
+        }))
+    }
+
+    pub fn decode<const B: u64>(self, delta: i64) -> Polynomial<N, B> {
+        Polynomial::<N, B>::new(core::array::from_fn(|i| {
+            // Round: ( value / Δ ), i.e. (value + Δ/2) / Δ  for positive Δ
+            let rounded = ((self.inner[i].value + delta / 2) / delta) as i64;
+            Element::<B>::new(rounded)
         }))
     }
 }
@@ -185,10 +194,12 @@ mod tests {
 
     #[test]
     fn test_bfv() {
-        const Q: u64 = 10000000;
         const N: usize = 800;
+        const T: u64 = 2;
+        const Q: u64 = 10_000_000;
+        const DELTA: i64 = (Q / T) as i64;
         let message = 3;
-        let m = Polynomial::<N, Q>::from_int(message);
+        let m = Polynomial::<N, Q>::from_int_scaled(message, DELTA);
         println!("M      = {:?}", m);
 
         /* Key Gen */
@@ -217,6 +228,7 @@ mod tests {
         /* Decryption */
         let d = c_1 + c_2 * sk.lift::<Q>();
         println!("d      = {:?}", d);
-        println!("lift d      = {:?}", d.lift::<2>());
+        let dec = d.decode::<2>(DELTA);
+        println!("dec d      = {:?}", dec);
     }
 }

@@ -56,7 +56,7 @@ impl<const A: u64> Mul for Element<A> {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self::Output {
         let a = A as i64;
-        Self::new(((self.value * rhs.value) % a + a) % a) // keep positive
+        Self::new((self.value * rhs.value) % a)
     }
 }
 
@@ -68,6 +68,21 @@ pub struct Polynomial<const N: usize, const A: u64> {
 
 impl<const N: usize, const A: u64> Polynomial<N, A> {
     pub fn new(inner: [Element<A>; N]) -> Self {
+        Self { inner }
+    }
+
+    pub fn from_int(int: u64) -> Self {
+        let inner: [Element<A>; N] = (0..N)
+            .map(|i| {
+                if i < u16::BITS as usize {
+                    Element::<A>::new(((int >> i) & 1) as i64)
+                } else {
+                    Element::<A>::new(0)
+                }
+            })
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
         Self { inner }
     }
 
@@ -170,9 +185,13 @@ mod tests {
 
     #[test]
     fn test_bfv() {
+        const Q: u64 = 10000000;
+        const N: usize = 800;
+        let message = 3;
+        let m = Polynomial::<N, Q>::from_int(message);
+        println!("M      = {:?}", m);
+
         /* Key Gen */
-        const Q: u64 = 7;
-        const N: usize = 10;
         let sk = Polynomial::<N, 2>::rand();
         println!("sk     = {:?}", sk);
         // also called as pk_2
@@ -188,7 +207,16 @@ mod tests {
         let e_1 = Polynomial::<N, Q>::ternary_error();
         let e_2 = Polynomial::<N, Q>::ternary_error();
 
-        let c_1 = pk1 * u + e_1;
+        let c_1 = pk1 * u + e_1 + m;
         let c_2 = a * u + e_2;
+        println!("c_1    = {:?}", c_1);
+        println!("c_2    = {:?}", c_2);
+
+        /* Homomorphic */
+
+        /* Decryption */
+        let d = c_1 + c_2 * sk.lift::<Q>();
+        println!("d      = {:?}", d);
+        println!("lift d      = {:?}", d.lift::<2>());
     }
 }

@@ -194,16 +194,17 @@ mod tests {
 
     #[test]
     fn test_bfv() {
-        const N: usize = 800;
-        const T: u64 = 2;
-        const Q: u64 = 10_000_000;
+        const N: usize = 4096;
+        // todo when t was 2, it doesn't worked
+        const T: u64 = 3;
+        const Q: u64 = 100000000000000;
         const DELTA: i64 = (Q / T) as i64;
-        let message = 3;
+        let message = 10;
         let m = Polynomial::<N, Q>::from_int_scaled(message, DELTA);
         println!("M      = {:?}", m);
 
         /* Key Gen */
-        let sk = Polynomial::<N, 2>::rand();
+        let sk = Polynomial::<N, T>::rand();
         println!("sk     = {:?}", sk);
         // also called as pk_2
         let a = Polynomial::<N, Q>::rand();
@@ -228,7 +229,7 @@ mod tests {
         /* Decryption */
         let d = c_1 + c_2 * sk.lift::<Q>();
         println!("d      = {:?}", d);
-        let dec = d.decode::<2>(DELTA);
+        let dec = d.decode::<T>(DELTA);
         println!("dec d      = {:?}", dec);
     }
 }

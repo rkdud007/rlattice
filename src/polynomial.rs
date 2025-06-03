@@ -143,6 +143,7 @@ impl<const N: usize, const A: u64> Add for Polynomial<N, A> {
     }
 }
 
+// todo: NTT/iNTT
 impl<const N: usize, const A: u64> Mul for Polynomial<N, A> {
     type Output = Self;
 

@@ -1,3 +1,6 @@
+//! https://inferati.azureedge.net/docs/inferati-fhe-bfv.pdf
+//! https://github.com/openfheorg/openfhe-development/tree/02a8e9c76c3e2eff53392530199c63e4da53eb65/src/pke/lib/scheme/bfvrns
+
 use crate::polynomial::Polynomial;
 use std::ops::{Add, Mul};
 
@@ -78,18 +81,24 @@ fn bits_lsb_first_to_u64(bits: &[i64]) -> u64 {
 mod tests {
     use super::*;
 
+    /*
+        t, n, logq = 16, 1024, 27
+        t, n, logq = 256, 2048, 37
+        t, n, logq = 1024, 4096, 58
+    */
+
     #[test]
     fn test_bfv_add() {
-        const N: usize = 4096;
+        const N: usize = 1024;
         // todo when t was 2, it doesn't worked
-        const T: u64 = 6;
-        const Q: u64 = 100000000000000;
+        const T: u64 = 16;
+        const Q: u64 = 132120577;
         let (bfv, sk) = Bfv::<N, Q, T>::keygen();
         // maximum message can be represent as 2^T - 1
-        let message_1 = 3;
+        let message_1 = 20;
         let enc_1 = bfv.encrypt(message_1);
 
-        let message_2 = 4;
+        let message_2 = 3;
         let enc_2 = bfv.encrypt(message_2);
 
         /* Homomorphic */
@@ -104,10 +113,10 @@ mod tests {
     #[test]
     fn test_bfv_mul() {
         // todo mul is just not working rn
-        const N: usize = 4096;
+        const N: usize = 1024;
 
-        const T: u64 = 6;
-        const Q: u64 = 100000000000000;
+        const T: u64 = 16;
+        const Q: u64 = 132120577;
         let (bfv, sk) = Bfv::<N, Q, T>::keygen();
         // maximum message can be represent as 2^T - 1
         let message_1 = 3;
@@ -118,7 +127,7 @@ mod tests {
 
         /* Homomorphic */
         let enc_3 = enc_1 * enc_2;
-
+        // todo: in case of add some value that over binary, it also not working
         let dec = enc_3.decrypt(sk);
         /* Decryption */
         println!("dec d      = {:?}", dec);

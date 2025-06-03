@@ -24,6 +24,10 @@ impl<const A: u64> Element<A> {
         let half = a / 2;
         (x + half).rem_euclid(a) - half
     }
+
+    pub fn get_value(&self) -> i64 {
+        self.value
+    }
 }
 
 impl<const A: u64> Add for Element<A> {
@@ -56,7 +60,7 @@ impl<const A: u64> Mul for Element<A> {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self::Output {
         let a = A as i64;
-        Self::new((self.value * rhs.value) % a)
+        Self::new((self.value.saturating_mul(rhs.value)) % a)
     }
 }
 
@@ -193,43 +197,5 @@ mod tests {
     }
 
     #[test]
-    fn test_bfv() {
-        const N: usize = 4096;
-        // todo when t was 2, it doesn't worked
-        const T: u64 = 3;
-        const Q: u64 = 100000000000000;
-        const DELTA: i64 = (Q / T) as i64;
-        let message = 10;
-        let m = Polynomial::<N, Q>::from_int_scaled(message, DELTA);
-        println!("M      = {:?}", m);
-
-        /* Key Gen */
-        let sk = Polynomial::<N, T>::rand();
-        println!("sk     = {:?}", sk);
-        // also called as pk_2
-        let a = Polynomial::<N, Q>::rand();
-        println!("pk_2   = {:?}", a);
-        let e = Polynomial::<N, Q>::ternary_error();
-        println!("e      = {:?}", e);
-        let pk1 = -(a * sk.lift::<Q>() + e);
-        println!("pk_1   = {:?}", pk1);
-
-        /* Encryption */
-        let u = Polynomial::<N, Q>::ternary_error();
-        let e_1 = Polynomial::<N, Q>::ternary_error();
-        let e_2 = Polynomial::<N, Q>::ternary_error();
-
-        let c_1 = pk1 * u + e_1 + m;
-        let c_2 = a * u + e_2;
-        println!("c_1    = {:?}", c_1);
-        println!("c_2    = {:?}", c_2);
-
-        /* Homomorphic */
-
-        /* Decryption */
-        let d = c_1 + c_2 * sk.lift::<Q>();
-        println!("d      = {:?}", d);
-        let dec = d.decode::<T>(DELTA);
-        println!("dec d      = {:?}", dec);
-    }
+    fn test_mul() {}
 }

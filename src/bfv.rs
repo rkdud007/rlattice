@@ -97,15 +97,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_bfv_add_xor_example() {
+    fn test_bfv_add_t_2_example() {
         const T: u64 = 2;
         type E = Element<T>;
         const N: usize = 4;
-        const Q: u64 = 128;
+        const Q: u64 = 32;
 
         let (bfv, sk) = Bfv::<N, Q, T>::keygen();
 
-        // q. is message is set as Eleemnt<2> because t=2? or message always should be binary representation regardless of it's modulus
         let m_a_1 = E::new(1);
         let m_a_2 = E::new(0);
         let m_a_3 = E::new(1);
@@ -119,6 +118,49 @@ mod tests {
         let m_b_1 = E::new(0);
         let m_b_2 = E::new(1);
         let m_b_3 = E::new(1);
+        let m_b_4 = E::new(1);
+        let m_b = Polynomial::<N, T>::new([m_b_1, m_b_2, m_b_3, m_b_4]);
+        println!("m_b {:?}", m_b);
+        let enc_b = bfv.encrypt(m_b);
+        let enc_b_ct = enc_b.c_1 + enc_b.c_2 * sk.lift::<Q>();
+        println!("enc_b_ct {:?}", enc_b_ct);
+
+        /* Homomorphic */
+        let enc_3 = enc_a + enc_b;
+        let enc_3_ct = enc_3.c_1 + enc_3.c_2 * sk.lift::<Q>();
+        println!("enc_3_ct {:?}", enc_3_ct);
+
+        let dec = enc_3.decrypt(sk);
+        /* Decryption */
+        // expect 1, 1, 0, 1
+        println!("dec d      = {:?}", dec);
+        let raw_add = m_a + m_b;
+        println!("raw = {:?}", raw_add);
+        assert_eq!(raw_add, dec);
+    }
+
+    #[test]
+    fn test_bfv_add_t_3_example() {
+        const T: u64 = 3;
+        type E = Element<T>;
+        const N: usize = 4;
+        const Q: u64 = 128;
+
+        let (bfv, sk) = Bfv::<N, Q, T>::keygen();
+
+        let m_a_1 = E::new(1);
+        let m_a_2 = E::new(2);
+        let m_a_3 = E::new(1);
+        let m_a_4 = E::new(0);
+        let m_a = Polynomial::<N, T>::new([m_a_1, m_a_2, m_a_3, m_a_4]);
+        println!("m_a {:?}", m_a);
+        let enc_a = bfv.encrypt(m_a);
+        let enc_a_ct = enc_a.c_1 + enc_a.c_2 * sk.lift::<Q>();
+        println!("enc_a_ct {:?}", enc_a_ct);
+
+        let m_b_1 = E::new(0);
+        let m_b_2 = E::new(2);
+        let m_b_3 = E::new(2);
         let m_b_4 = E::new(1);
         let m_b = Polynomial::<N, T>::new([m_b_1, m_b_2, m_b_3, m_b_4]);
         println!("m_b {:?}", m_b);

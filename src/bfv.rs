@@ -29,6 +29,7 @@ impl<const N: usize, const Q: u64, const T: u64> Bfv<N, Q, T> {
         let sk = Polynomial::<N, 2>::rand();
         let a = Polynomial::<N, Q>::rand();
         let e = Polynomial::<N, Q>::ternary_error();
+        println!("e {:?}", e);
         let pk1 = -(a * sk.lift::<Q>() + e);
         (Self { pk: (pk1, a) }, sk)
     }
@@ -39,6 +40,8 @@ impl<const N: usize, const Q: u64, const T: u64> Bfv<N, Q, T> {
         let u = Polynomial::<N, 2>::rand();
         let e_1 = Polynomial::<N, Q>::ternary_error();
         let e_2 = Polynomial::<N, Q>::ternary_error();
+        println!("e_1 {:?}", e_1);
+        println!("e_2 {:?}", e_2);
         let u = u.lift::<Q>();
 
         let c_1 = self.pk.0 * u + e_1 + delta_m;
@@ -53,12 +56,19 @@ impl<const N: usize, const Q: u64, const T: u64> BfvCipher<N, Q, T> {
         let ct = self.c_1 + self.c_2 * sk.lift::<Q>();
         let delta: u64 = Q.div_ceil(T);
         // (ct + Δ/2) / Δ  mod t
-        let mut coeffs = [Element::<T>::new(0); N];
-        for (d, c) in coeffs.iter_mut().zip(ct.inner) {
-            let rounded = ((c.value() as u64 + delta / 2) / delta) % T;
-            *d = Element::<T>::new(rounded as i64);
-        }
-        Polynomial::new(coeffs)
+        let p_inner: [_; N] = ct
+            .inner
+            .iter()
+            .map(|e| {
+                let rounded = (e.value() as u64 + delta / 2) / delta;
+                println!("{}", rounded);
+                Element::<T>::new(rounded as i64)
+            })
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
+        Polynomial::new(p_inner)
+        // ct.msb()
     }
 }
 
@@ -91,7 +101,7 @@ mod tests {
         const T: u64 = 2;
         type E = Element<T>;
         const N: usize = 4;
-        const Q: u64 = 64;
+        const Q: u64 = 128;
 
         let (bfv, sk) = Bfv::<N, Q, T>::keygen();
 

@@ -103,7 +103,7 @@ impl<const N: usize, const A: u64> Polynomial<N, A> {
         }))
     }
 
-    /// Uniform error in {-1,0,+1}.  Good enough for tests.
+    /// Uniform error in {0,1}.  Good enough for tests.
     pub fn ternary_error() -> Self {
         let mut rng = rand::rng();
         Self::new(core::array::from_fn(|_| {
@@ -112,18 +112,18 @@ impl<const N: usize, const A: u64> Polynomial<N, A> {
         }))
     }
 
-    pub fn msb(self) -> Polynomial<N, 2> {
-        Polynomial::<N, 2>::new(core::array::from_fn(|i| {
-            let v = self.inner[i].value;
-            let bit = u64_msb(v, A.ilog2() as usize);
-            Element::<2>::new(bit as i64)
-        }))
-    }
+    // pub fn msb(self) -> Polynomial<N, 2> {
+    //     Polynomial::<N, 2>::new(core::array::from_fn(|i| {
+    //         let v = self.inner[i].value;
+    //         let bit = u64_msb(v, A.ilog2() as usize);
+    //         Element::<2>::new(bit as i64)
+    //     }))
+    // }
 }
 
-pub fn u64_msb(value: u64, len: usize) -> u64 {
-    (value >> (len - 1)) & 1
-}
+// pub fn u64_msb(value: u64, len: usize) -> u64 {
+//     (value >> (len - 1)) & 1
+// }
 
 impl<const N: usize, const A: u64> fmt::Debug for Polynomial<N, A> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

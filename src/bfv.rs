@@ -35,7 +35,6 @@ impl<const N: usize, const Q: u64, const T: u64> Bfv<N, Q, T> {
 
     pub fn encrypt(&self, message: Polynomial<N, 2>) -> BfvCipher<N, Q, T> {
         let delta_elem = Element::<Q>::new(Q.div_ceil(T) as i64);
-        println!("delta:{:?}", delta_elem);
         let delta_m = message.lift::<Q>() * delta_elem;
         let u = Polynomial::<N, 2>::rand();
         let e_1 = Polynomial::<N, Q>::ternary_error();
@@ -50,12 +49,16 @@ impl<const N: usize, const Q: u64, const T: u64> Bfv<N, Q, T> {
 }
 
 impl<const N: usize, const Q: u64, const T: u64> BfvCipher<N, Q, T> {
-    pub fn decrypt(self, sk: Polynomial<N, 2>) -> Polynomial<N, 2> {
-        let inv_delta_elem = Element::<Q>::new(T.div_ceil(Q) as i64);
+    pub fn decrypt(self, sk: Polynomial<N, 2>) -> Polynomial<N, T> {
         let ct = self.c_1 + self.c_2 * sk.lift::<Q>();
-        let mul_ct = ct * inv_delta_elem;
-        // q. msb for 1 bit is cus T is 2 or just always 1 bit
-        mul_ct.msb()
+        let delta: u64 = Q.div_ceil(T);
+        // (ct + Δ/2) / Δ  mod t
+        let mut coeffs = [Element::<T>::new(0); N];
+        for (d, c) in coeffs.iter_mut().zip(ct.inner) {
+            let rounded = ((c.value() as u64 + delta / 2) / delta) % T;
+            *d = Element::<T>::new(rounded as i64);
+        }
+        Polynomial::new(coeffs)
     }
 }
 

@@ -1,3 +1,4 @@
+//! Implementation of BFV especially public key FHE.
 //! https://inferati.azureedge.net/docs/inferati-fhe-bfv.pdf
 //! https://github.com/openfheorg/openfhe-development/tree/02a8e9c76c3e2eff53392530199c63e4da53eb65/src/pke/lib/scheme/bfvrns
 //!

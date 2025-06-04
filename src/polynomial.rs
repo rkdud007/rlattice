@@ -97,16 +97,22 @@ impl<const N: usize, const A: u64> Polynomial<N, A> {
     }
 
     pub fn msb<const T: u64>(self) -> Polynomial<N, T> {
+        let log_t = T.ilog2() as usize;
         Polynomial::<N, T>::new(core::array::from_fn(|i| {
             let v = self.inner[i].value;
-            let bit = u64_msb(v, A.ilog2() as usize);
-            Element::<T>::new(bit as i64)
+            let bits = u64_msb_bits(v, A.ilog2() as usize, log_t);
+            Element::<T>::new(bits as i64)
         }))
     }
 }
 
 pub fn u64_msb(value: u64, len: usize) -> u64 {
     (value >> (len - 1)) & 1
+}
+
+pub fn u64_msb_bits(value: u64, len: usize, log_t: usize) -> u64 {
+    let shift = len.saturating_sub(log_t);
+    (value >> shift) & ((1 << log_t) - 1)
 }
 
 impl<const N: usize, const A: u64> fmt::Debug for Polynomial<N, A> {

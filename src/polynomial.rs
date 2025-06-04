@@ -70,22 +70,6 @@ impl<const N: usize, const A: u64> Polynomial<N, A> {
         Self { inner }
     }
 
-    pub fn from_int_scaled(int: u64, delta: i64) -> Self {
-        let inner: [Element<A>; N] = (0..N)
-            .map(|i| {
-                if i < u16::BITS as usize {
-                    // multiply bit by Δ before lifting into Z_q
-                    Element::<A>::new(((int >> i) & 1) as i64 * delta)
-                } else {
-                    Element::<A>::new(0)
-                }
-            })
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap();
-        Self { inner }
-    }
-
     pub fn rand() -> Self {
         let mut rng = rand::rng();
         let side = Uniform::new(0, A as i64).unwrap();

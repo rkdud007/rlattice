@@ -48,25 +48,20 @@ impl<const N: usize, const Q: u64, const T: u64> Add for BfvCipher<N, Q, T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::Rng;
 
     #[test]
     fn test_bfv_add_t_2_example() {
         const T: u64 = 2;
-        type E = Element<T>;
         const N: usize = 4;
         const Q: u64 = 32;
 
         let (bfv, sk) = Bfv::<N, Q, T>::keygen();
-        let mut rng = rand::rng();
 
-        let m_a_coeffs: [E; N] = core::array::from_fn(|_| E::new(rng.random_range(0..T) as i64));
-        let m_a = Polynomial::<N, T>::new(m_a_coeffs);
+        let m_a = Polynomial::<N, T>::rand();
         println!("m_a {:?}", m_a);
         let enc_a = bfv.encrypt(m_a, sk);
 
-        let m_b_coeffs: [E; N] = core::array::from_fn(|_| E::new(rng.random_range(0..T) as i64));
-        let m_b = Polynomial::<N, T>::new(m_b_coeffs);
+        let m_b = Polynomial::<N, T>::rand();
         println!("m_b {:?}", m_b);
         let enc_b = bfv.encrypt(m_b, sk);
 
@@ -84,25 +79,24 @@ mod tests {
     #[test]
     fn test_bfv_add_t_4_example() {
         const T: u64 = 4;
-        type E = Element<T>;
         const N: usize = 4;
         const Q: u64 = 32;
 
         let (bfv, sk) = Bfv::<N, Q, T>::keygen();
-        let mut rng = rand::rng();
 
-        let m_a_coeffs: [E; N] = core::array::from_fn(|_| E::new(rng.random_range(0..T) as i64));
-        let m_a = Polynomial::<N, T>::new(m_a_coeffs);
+        let m_a = Polynomial::<N, T>::rand();
         println!("m_a {:?}", m_a);
         let enc_a = bfv.encrypt(m_a, sk);
+        println!("enc_a {:?}", enc_a);
 
-        let m_b_coeffs: [E; N] = core::array::from_fn(|_| E::new(rng.random_range(0..T) as i64));
-        let m_b = Polynomial::<N, T>::new(m_b_coeffs);
+        let m_b = Polynomial::<N, T>::rand();
         println!("m_b {:?}", m_b);
         let enc_b = bfv.encrypt(m_b, sk);
+        println!("enc_b {:?}", enc_b);
 
         /* Homomorphic */
         let enc_3 = enc_a + enc_b;
+        println!("enc_3 {:?}", enc_3);
 
         /* Decryption */
         let raw_add = m_a + m_b;

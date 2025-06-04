@@ -33,7 +33,7 @@ impl<const N: usize, const Q: u64, const T: u64> Bfv<N, Q, T> {
         (Self { pk: (pk1, a) }, sk)
     }
 
-    pub fn encrypt(&self, message: Polynomial<N, 2>) -> BfvCipher<N, Q, T> {
+    pub fn encrypt(&self, message: Polynomial<N, T>) -> BfvCipher<N, Q, T> {
         let delta_elem = Element::<Q>::new(Q.div_ceil(T) as i64);
         let delta_m = message.lift::<Q>() * delta_elem;
         let u = Polynomial::<N, 2>::rand();
@@ -88,10 +88,10 @@ mod tests {
 
     #[test]
     fn test_bfv_add_xor_example() {
-        type E = Element<2>;
+        type E = Element<3>;
         const N: usize = 4;
-        const T: u64 = 2;
-        const Q: u64 = 32;
+        const T: u64 = 3;
+        const Q: u64 = 64;
 
         let (bfv, sk) = Bfv::<N, Q, T>::keygen();
 
@@ -100,7 +100,7 @@ mod tests {
         let m_a_2 = E::new(0);
         let m_a_3 = E::new(1);
         let m_a_4 = E::new(0);
-        let m_a = Polynomial::<4, 2>::new([m_a_1, m_a_2, m_a_3, m_a_4]);
+        let m_a = Polynomial::<4, 3>::new([m_a_1, m_a_2, m_a_3, m_a_4]);
         println!("m_a {:?}", m_a);
         let enc_a = bfv.encrypt(m_a);
         let enc_a_ct = enc_a.c_1 + enc_a.c_2 * sk.lift::<Q>();
@@ -110,7 +110,7 @@ mod tests {
         let m_b_2 = E::new(1);
         let m_b_3 = E::new(1);
         let m_b_4 = E::new(1);
-        let m_b = Polynomial::<4, 2>::new([m_b_1, m_b_2, m_b_3, m_b_4]);
+        let m_b = Polynomial::<4, 3>::new([m_b_1, m_b_2, m_b_3, m_b_4]);
         println!("m_b {:?}", m_b);
         let enc_b = bfv.encrypt(m_b);
         let enc_b_ct = enc_b.c_1 + enc_b.c_2 * sk.lift::<Q>();

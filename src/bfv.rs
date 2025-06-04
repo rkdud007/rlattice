@@ -34,7 +34,8 @@ impl<const N: usize, const Q: u64, const T: u64> Bfv<N, Q, T> {
     }
 
     pub fn encrypt(&self, message: Polynomial<N, 2>) -> BfvCipher<N, Q, T> {
-        let delta_elem = Element::<Q>::new((Q / T) as i64);
+        let delta_elem = Element::<Q>::new(Q.div_ceil(T) as i64);
+        println!("delta:{:?}", delta_elem);
         let delta_m = message.lift::<Q>() * delta_elem;
         let u = Polynomial::<N, 2>::rand();
         let e_1 = Polynomial::<N, Q>::ternary_error();
@@ -50,11 +51,11 @@ impl<const N: usize, const Q: u64, const T: u64> Bfv<N, Q, T> {
 
 impl<const N: usize, const Q: u64, const T: u64> BfvCipher<N, Q, T> {
     pub fn decrypt(self, sk: Polynomial<N, 2>) -> Polynomial<N, 2> {
+        let inv_delta_elem = Element::<Q>::new(T.div_ceil(Q) as i64);
         let ct = self.c_1 + self.c_2 * sk.lift::<Q>();
-        println!("ct {:?}", ct);
-        let m = ct.msb();
-        println!("{:?}", m);
-        m
+        let mul_ct = ct * inv_delta_elem;
+        // q. msb for 1 bit is cus T is 2 or just always 1 bit
+        mul_ct.msb()
     }
 }
 
@@ -91,27 +92,39 @@ mod tests {
 
         let (bfv, sk) = Bfv::<N, Q, T>::keygen();
 
+        // q. is message is set as Eleemnt<2> because t=2? or message always should be binary representation regardless of it's modulus
         let m_a_1 = E::new(1);
         let m_a_2 = E::new(0);
         let m_a_3 = E::new(1);
         let m_a_4 = E::new(0);
         let m_a = Polynomial::<4, 2>::new([m_a_1, m_a_2, m_a_3, m_a_4]);
+        println!("m_a {:?}", m_a);
         let enc_a = bfv.encrypt(m_a);
+        let enc_a_ct = enc_a.c_1 + enc_a.c_2 * sk.lift::<Q>();
+        println!("enc_a_ct {:?}", enc_a_ct);
 
         let m_b_1 = E::new(0);
         let m_b_2 = E::new(1);
         let m_b_3 = E::new(1);
         let m_b_4 = E::new(1);
         let m_b = Polynomial::<4, 2>::new([m_b_1, m_b_2, m_b_3, m_b_4]);
+        println!("m_b {:?}", m_b);
         let enc_b = bfv.encrypt(m_b);
+        let enc_b_ct = enc_b.c_1 + enc_b.c_2 * sk.lift::<Q>();
+        println!("enc_b_ct {:?}", enc_b_ct);
 
         /* Homomorphic */
         let enc_3 = enc_a + enc_b;
+        let enc_3_ct = enc_3.c_1 + enc_3.c_2 * sk.lift::<Q>();
+        println!("enc_3_ct {:?}", enc_3_ct);
 
         let dec = enc_3.decrypt(sk);
         /* Decryption */
         // expect 1, 1, 0, 1
         println!("dec d      = {:?}", dec);
+        let raw_add = m_a + m_b;
+        println!("raw = {:?}", raw_add);
+        assert_eq!(raw_add, dec);
     }
 
     // #[test]

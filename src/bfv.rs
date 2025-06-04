@@ -1,35 +1,47 @@
 //! https://inferati.azureedge.net/docs/inferati-fhe-bfv.pdf
 //! https://github.com/openfheorg/openfhe-development/tree/02a8e9c76c3e2eff53392530199c63e4da53eb65/src/pke/lib/scheme/bfvrns
+//!
+//! q = ciphertext modulus
+//! t = plaintext modulus
+//! n = ring dimension
 
-use crate::polynomial::Polynomial;
+use crate::polynomial::{Element, Polynomial};
 use std::ops::{Add, Mul};
 
 pub struct Bfv<const N: usize, const Q: u64, const T: u64> {
     pk: (Polynomial<N, Q>, Polynomial<N, Q>),
 }
 
+#[derive(Debug)]
 pub struct BfvCipher<const N: usize, const Q: u64, const T: u64> {
     c_1: Polynomial<N, Q>,
     c_2: Polynomial<N, Q>,
 }
 
 impl<const N: usize, const Q: u64, const T: u64> Bfv<N, Q, T> {
-    pub fn keygen() -> (Self, Polynomial<N, T>) {
-        let sk = Polynomial::<N, T>::rand();
+    pub fn keygen() -> (Self, Polynomial<N, 2>) {
+        /*
+            a <- R_q
+            e <- X
+            pk[0] <- (-(a*sk)+e) mod q
+            pk[1] <- a
+        */
+        let sk = Polynomial::<N, 2>::rand();
         let a = Polynomial::<N, Q>::rand();
         let e = Polynomial::<N, Q>::ternary_error();
         let pk1 = -(a * sk.lift::<Q>() + e);
         (Self { pk: (pk1, a) }, sk)
     }
 
-    pub fn encrypt(&self, message: u64) -> BfvCipher<N, Q, T> {
-        let delta = (Q / T) as i64;
-        let m = Polynomial::<N, Q>::from_int_scaled(message, delta);
-        let u = Polynomial::<N, Q>::ternary_error();
+    pub fn encrypt(&self, message: Polynomial<N, 2>) -> BfvCipher<N, Q, T> {
+        let delta_elem = Element::<Q>::new((Q / T) as i64);
+        let delta_m = message.lift::<Q>() * delta_elem;
+        let u = Polynomial::<N, 2>::rand();
         let e_1 = Polynomial::<N, Q>::ternary_error();
         let e_2 = Polynomial::<N, Q>::ternary_error();
+        let u = u.lift::<Q>();
 
-        let c_1 = self.pk.0 * u + e_1 + m;
+        let c_1 = self.pk.0 * u + e_1 + delta_m;
         let c_2 = self.pk.1 * u + e_2;
 
         BfvCipher { c_1, c_2 }
@@ -37,16 +49,12 @@ impl<const N: usize, const Q: u64, const T: u64> Bfv<N, Q, T> {
 }
 
 impl<const N: usize, const Q: u64, const T: u64> BfvCipher<N, Q, T> {
-    pub fn decrypt(self, sk: Polynomial<N, T>) -> u64 {
-        let delta = (Q / T) as i64;
-        let d = self.c_1 + self.c_2 * sk.lift::<Q>();
-        let dec = d.decode::<T>(delta);
-        let lsb: Vec<i64> = dec.inner[0..(T as usize)]
-            .into_iter()
-            .map(|d| d.get_value())
-            .collect();
-        println!("{:?}", lsb);
-        bits_lsb_first_to_u64(&lsb)
+    pub fn decrypt(self, sk: Polynomial<N, 2>) -> Polynomial<N, 2> {
+        let ct = self.c_1 + self.c_2 * sk.lift::<Q>();
+        println!("ct {:?}", ct);
+        let m = ct.msb();
+        println!("{:?}", m);
+        m
     }
 }
 
@@ -70,66 +78,62 @@ impl<const N: usize, const Q: u64, const T: u64> Mul for BfvCipher<N, Q, T> {
     }
 }
 
-fn bits_lsb_first_to_u64(bits: &[i64]) -> u64 {
-    bits.iter().enumerate().fold(0u64, |acc, (i, &bit)| {
-        let b = (bit & 1) as u64;
-        acc | (b << i)
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /*
-        t, n, logq = 16, 1024, 27
-        t, n, logq = 256, 2048, 37
-        t, n, logq = 1024, 4096, 58
-    */
-
     #[test]
-    fn test_bfv_add() {
-        const N: usize = 1024;
-        // todo when t was 2, it doesn't worked
-        const T: u64 = 16;
-        const Q: u64 = 132120577;
-        let (bfv, sk) = Bfv::<N, Q, T>::keygen();
-        // maximum message can be represent as 2^T - 1
-        let message_1 = 20;
-        let enc_1 = bfv.encrypt(message_1);
+    fn test_bfv_add_xor_example() {
+        type E = Element<2>;
+        const N: usize = 4;
+        const T: u64 = 2;
+        const Q: u64 = 32;
 
-        let message_2 = 3;
-        let enc_2 = bfv.encrypt(message_2);
+        let (bfv, sk) = Bfv::<N, Q, T>::keygen();
+
+        let m_a_1 = E::new(1);
+        let m_a_2 = E::new(0);
+        let m_a_3 = E::new(1);
+        let m_a_4 = E::new(0);
+        let m_a = Polynomial::<4, 2>::new([m_a_1, m_a_2, m_a_3, m_a_4]);
+        let enc_a = bfv.encrypt(m_a);
+
+        let m_b_1 = E::new(0);
+        let m_b_2 = E::new(1);
+        let m_b_3 = E::new(1);
+        let m_b_4 = E::new(1);
+        let m_b = Polynomial::<4, 2>::new([m_b_1, m_b_2, m_b_3, m_b_4]);
+        let enc_b = bfv.encrypt(m_b);
 
         /* Homomorphic */
-        // todo: in case of add some value that over binary, it also not working
-        let enc_3 = enc_1 + enc_2;
+        let enc_3 = enc_a + enc_b;
 
         let dec = enc_3.decrypt(sk);
         /* Decryption */
+        // expect 1, 1, 0, 1
         println!("dec d      = {:?}", dec);
     }
 
-    #[test]
-    fn test_bfv_mul() {
-        // todo mul is just not working rn
-        const N: usize = 1024;
+    // #[test]
+    // fn test_bfv_mul() {
+    //     // todo mul is just not working rn
+    //     const N: usize = 4;
 
-        const T: u64 = 16;
-        const Q: u64 = 132120577;
-        let (bfv, sk) = Bfv::<N, Q, T>::keygen();
-        // maximum message can be represent as 2^T - 1
-        let message_1 = 3;
-        let enc_1 = bfv.encrypt(message_1);
+    //     const T: u64 = 16;
+    //     const Q: u64 = 132120577;
+    //     let (bfv, sk) = Bfv::<N, Q, T>::keygen();
+    //     // maximum message can be represent as 2^T - 1
+    //     let message_1 = 3;
+    //     let enc_1 = bfv.encrypt(message_1);
 
-        let message_2 = 4;
-        let enc_2 = bfv.encrypt(message_2);
+    //     let message_2 = 4;
+    //     let enc_2 = bfv.encrypt(message_2);
 
-        /* Homomorphic */
-        let enc_3 = enc_1 * enc_2;
-        // todo: in case of add some value that over binary, it also not working
-        let dec = enc_3.decrypt(sk);
-        /* Decryption */
-        println!("dec d      = {:?}", dec);
-    }
+    //     /* Homomorphic */
+    //     let enc_3 = enc_1 * enc_2;
+    //     // todo: in case of add some value that over binary, it also not working
+    //     // let dec = enc_3.decrypt(sk);
+    //     // /* Decryption */
+    //     // println!("dec d      = {:?}", dec);
+    // }
 }

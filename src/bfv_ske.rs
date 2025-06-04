@@ -1,0 +1,94 @@
+use crate::polynomial::{Element, Polynomial};
+use std::ops::Add;
+
+pub struct Bfv<const N: usize, const Q: u64, const T: u64> {}
+
+#[derive(Debug)]
+pub struct BfvCipher<const N: usize, const Q: u64, const T: u64> {
+    c_1: Polynomial<N, Q>,
+    c_2: Polynomial<N, Q>,
+}
+
+impl<const N: usize, const Q: u64, const T: u64> Bfv<N, Q, T> {
+    pub fn keygen() -> (Self, Polynomial<N, 2>) {
+        let sk = Polynomial::<N, 2>::rand();
+        (Self {}, sk)
+    }
+
+    pub fn encrypt(&self, message: Polynomial<N, T>, sk: Polynomial<N, 2>) -> BfvCipher<N, Q, T> {
+        let delta_elem = Element::<Q>::new(Q.div_ceil(T) as i64);
+        let delta_m = message.lift::<Q>() * delta_elem;
+
+        let a = Polynomial::<N, Q>::rand();
+        let e = Polynomial::<N, Q>::ternary_error();
+        let c_1 = sk.lift::<Q>() * a + delta_m + e;
+        let c_2 = -a;
+
+        BfvCipher { c_1, c_2 }
+    }
+}
+
+impl<const N: usize, const Q: u64, const T: u64> BfvCipher<N, Q, T> {
+    pub fn decrypt(self, sk: Polynomial<N, 2>) -> Polynomial<N, T> {
+        let ct = self.c_1 + self.c_2 * sk.lift::<Q>();
+        ct.msb()
+    }
+}
+
+impl<const N: usize, const Q: u64, const T: u64> Add for BfvCipher<N, Q, T> {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        let c_1 = self.c_1 + rhs.c_1;
+        let c_2 = self.c_2 + rhs.c_2;
+        Self { c_1, c_2 }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bfv_add_t_2_example() {
+        const T: u64 = 2;
+        type E = Element<T>;
+        const N: usize = 4;
+        const Q: u64 = 32;
+
+        let (bfv, sk) = Bfv::<N, Q, T>::keygen();
+
+        let m_a_1 = E::new(1);
+        let m_a_2 = E::new(0);
+        let m_a_3 = E::new(1);
+        let m_a_4 = E::new(0);
+        let m_a = Polynomial::<N, T>::new([m_a_1, m_a_2, m_a_3, m_a_4]);
+        println!("m_a {:?}", m_a);
+        let enc_a = bfv.encrypt(m_a, sk);
+        let enc_a_ct = enc_a.c_1 + enc_a.c_2 * sk.lift::<Q>();
+        println!("enc_a_ct {:?}", enc_a_ct);
+
+        let m_b_1 = E::new(0);
+        let m_b_2 = E::new(1);
+        let m_b_3 = E::new(1);
+        let m_b_4 = E::new(1);
+        let m_b = Polynomial::<N, T>::new([m_b_1, m_b_2, m_b_3, m_b_4]);
+        println!("m_b {:?}", m_b);
+        let enc_b = bfv.encrypt(m_b, sk);
+        let enc_b_ct = enc_b.c_1 + enc_b.c_2 * sk.lift::<Q>();
+        println!("enc_b_ct {:?}", enc_b_ct);
+
+        /* Homomorphic */
+        let enc_3 = enc_a + enc_b;
+        let enc_3_ct = enc_3.c_1 + enc_3.c_2 * sk.lift::<Q>();
+        println!("enc_3_ct {:?}", enc_3_ct);
+
+        let dec = enc_3.decrypt(sk);
+        /* Decryption */
+        // expect 1, 1, 0, 1
+        println!("dec d      = {:?}", dec);
+        let raw_add = m_a + m_b;
+        println!("raw = {:?}", raw_add);
+        assert_eq!(raw_add, dec);
+    }
+}

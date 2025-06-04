@@ -6,7 +6,7 @@
 //! n = ring dimension
 
 use crate::polynomial::{Element, Polynomial};
-use std::ops::{Add, Mul};
+use std::ops::Add;
 
 pub struct Bfv<const N: usize, const Q: u64, const T: u64> {
     pk: (Polynomial<N, Q>, Polynomial<N, Q>),
@@ -82,15 +82,16 @@ impl<const N: usize, const Q: u64, const T: u64> Add for BfvCipher<N, Q, T> {
     }
 }
 
-impl<const N: usize, const Q: u64, const T: u64> Mul for BfvCipher<N, Q, T> {
-    type Output = Self;
+// todo fix
+// impl<const N: usize, const Q: u64, const T: u64> Mul for BfvCipher<N, Q, T> {
+//     type Output = Self;
 
-    fn mul(self, rhs: Self) -> Self::Output {
-        let c_1 = self.c_1 * rhs.c_1;
-        let c_2 = self.c_2 * rhs.c_2;
-        Self { c_1, c_2 }
-    }
-}
+//     fn mul(self, rhs: Self) -> Self::Output {
+//         let c_1 = self.c_1 * rhs.c_1;
+//         let c_2 = self.c_2 * rhs.c_2;
+//         Self { c_1, c_2 }
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
@@ -181,27 +182,4 @@ mod tests {
         println!("raw = {:?}", raw_add);
         assert_eq!(raw_add, dec);
     }
-
-    // #[test]
-    // fn test_bfv_mul() {
-    //     // todo mul is just not working rn
-    //     const N: usize = 4;
-
-    //     const T: u64 = 16;
-    //     const Q: u64 = 132120577;
-    //     let (bfv, sk) = Bfv::<N, Q, T>::keygen();
-    //     // maximum message can be represent as 2^T - 1
-    //     let message_1 = 3;
-    //     let enc_1 = bfv.encrypt(message_1);
-
-    //     let message_2 = 4;
-    //     let enc_2 = bfv.encrypt(message_2);
-
-    //     /* Homomorphic */
-    //     let enc_3 = enc_1 * enc_2;
-    //     // todo: in case of add some value that over binary, it also not working
-    //     // let dec = enc_3.decrypt(sk);
-    //     // /* Decryption */
-    //     // println!("dec d      = {:?}", dec);
-    // }
 }

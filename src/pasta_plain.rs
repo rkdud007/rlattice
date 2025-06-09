@@ -48,82 +48,73 @@ impl Pasta {
         }
     }
 
-    // pub fn encrypt(&self, plain: &[u64]) -> Vec<u64> {
-    //     let mut ct = plain.to_vec();
-    //     let n_blocks = (plain.len() + PASTA_T - 1) / PASTA_T;
+    pub fn encrypt(&mut self, plaintext: &[u64]) -> Vec<u64> {
+        let n_blocks = (plaintext.len() + PASTA_T - 1) / PASTA_T;
+        let mut out = plaintext.to_vec();
 
-    //     for b in 0..n_blocks {
-    //         let ks = self.keystream(NONCE, b as u64);
-    //         for (i, w) in ct[b * PASTA_T..].iter_mut().take(PASTA_T).enumerate() {
-    //             *w = add_mod(*w, ks[i], self.p);
-    //         }
-    //     }
-    //     ct
-    // }
+        for b in 0..n_blocks {
+            let ks = self.keystream(NONCE, b as u64);
+            for (i, w) in out[b * PASTA_T..].iter_mut().take(PASTA_T).enumerate() {
+                *w = add_mod(*w, ks[i], self.p);
+            }
+        }
+        out
+    }
+    pub fn decrypt(&mut self, ciphertext: &[u64]) -> Vec<u64> {
+        let n_blocks = (ciphertext.len() + PASTA_T - 1) / PASTA_T;
+        let mut out = ciphertext.to_vec();
 
-    // pub fn decrypt(&self, cipher: &[u64]) -> Vec<u64> {
-    //     let mut pt = cipher.to_vec();
-    //     let n_blocks = (cipher.len() + PASTA_T - 1) / PASTA_T;
+        for b in 0..n_blocks {
+            let ks = self.keystream(NONCE, b as u64);
+            for (i, w) in out[b * PASTA_T..].iter_mut().take(PASTA_T).enumerate() {
+                let mut v = *w;
+                if v < ks[i] {
+                    v = v.wrapping_add(self.p);
+                }
+                *w = v - ks[i];
+            }
+        }
+        out
+    }
 
-    //     for b in 0..n_blocks {
-    //         let ks = self.keystream(NONCE, b as u64);
-    //         for (i, w) in pt[b * PASTA_T..].iter_mut().take(PASTA_T).enumerate() {
-    //             let mut v = *w;
-    //             if v < ks[i] {
-    //                 v = v.wrapping_add(self.p);
-    //             }
-    //             *w = v - ks[i];
-    //         }
-    //     }
-    //     pt
-    // }
+    pub fn keystream(&mut self, nonce: u64, block_counter: u64) -> Block {
+        self.init_shake(nonce, block_counter);
 
-    // pub fn keystream(&self, nonce: u64, ctr: u64) -> Block {
-    //     // --- initial state (key split) ---
-    //     let mut s1: Block = [0; PASTA_T];
-    //     let mut s2: Block = [0; PASTA_T];
-    //     s1.copy_from_slice(&self.key[..PASTA_T]);
-    //     s2.copy_from_slice(&self.key[PASTA_T..]);
+        let mut l: Block = [0; PASTA_T];
+        let mut r: Block = [0; PASTA_T];
+        l.copy_from_slice(&self.key[..PASTA_T]);
+        r.copy_from_slice(&self.key[PASTA_T..]);
 
-    //     let mut xof = Self::init_shake(nonce, ctr);
+        for r_idx in 0..PASTA_R {
+            self.round(&mut l, &mut r, r_idx);
+        }
+        self.linear_layer(&mut l);
+        self.linear_layer(&mut r);
+        self.mix(&mut l, &mut r);
 
-    //     for r in 0..PASTA_R {
-    //         self.linear_layer(&mut s1, &mut xof);
-    //         self.linear_layer(&mut s2, &mut xof);
-    //         self.mix(&mut s1, &mut s2);
+        l
+    }
 
-    //         if r == PASTA_R - 1 {
-    //             Self::sbox_cube(&mut s1, self.p);
-    //             Self::sbox_cube(&mut s2, self.p);
-    //         } else {
-    //             Self::sbox_feistel(&mut s1, self.p);
-    //             Self::sbox_feistel(&mut s2, self.p);
-    //         }
-    //     }
+    fn round(&mut self, l: &mut Block, r: &mut Block, r_idx: usize) {
+        self.linear_layer(l);
+        self.linear_layer(r);
+        self.mix(l, r);
 
-    //     // final affine + mix
-    //     self.linear_layer(&mut s1, &mut xof);
-    //     self.linear_layer(&mut s2, &mut xof);
-    //     self.mix(&mut s1, &mut s2);
-
-    //     s1 // truncation – left branch only
-    // }
-
-    fn mix(&self, s1: &mut Block, s2: &mut Block) {
-        for i in 0..PASTA_T {
-            let sum = add_mod(s1[i], s2[i], self.p);
-            s1[i] = add_mod(s1[i], sum, self.p);
-            s2[i] = add_mod(s2[i], sum, self.p);
+        if r_idx == PASTA_R - 1 {
+            Self::sbox_cube(l, self.p);
+            Self::sbox_cube(r, self.p);
+        } else {
+            Self::sbox_feistel(l, self.p);
+            Self::sbox_feistel(r, self.p);
         }
     }
 
     fn sbox_cube(state: &mut Block, p: u64) {
-        for v in state.iter_mut() {
-            let sq = mul_mod(*v, *v, p);
-            *v = mul_mod(sq, *v, p);
+        for x in state.iter_mut() {
+            let sq = mul_mod(*x, *x, p);
+            *x = mul_mod(sq, *x, p);
         }
     }
-
     fn sbox_feistel(state: &mut Block, p: u64) {
         let mut out = *state;
         for i in 1..PASTA_T {
@@ -133,36 +124,27 @@ impl Pasta {
         *state = out;
     }
 
-    // fn linear_layer(&self, state: &mut Block, xof: &mut impl ExtendableXof) {
-    //     let first = self.rand_vec(xof, false);
-    //     let mut row = first.clone();
-    //     let mut new_state = [0u64; PASTA_T];
-
-    //     for i in 0..PASTA_T {
-    //         for j in 0..PASTA_T {
-    //             new_state[i] = add_mod(new_state[i], mul_mod(row[j], state[j], self.p), self.p);
-    //         }
-    //         if i != PASTA_T - 1 {
-    //             row = Self::next_row(&row, &first, self.p);
-    //         }
-    //     }
-    //     *state = new_state;
-    //     let rc = self.rand_vec(xof, true);
-    //     for i in 0..PASTA_T {
-    //         state[i] = add_mod(state[i], rc[i], self.p);
-    //     }
-    // }
-
-    fn next_row(prev: &[u64], first: &[u64], p: u64) -> Vec<u64> {
-        let mut out = vec![0u64; PASTA_T];
-        for j in 0..PASTA_T {
-            let mut v = mul_mod(first[j], prev[PASTA_T - 1], p);
-            if j != 0 {
-                v = add_mod(v, prev[j - 1], p);
-            }
-            out[j] = v;
+    fn mix(&self, l: &mut Block, r: &mut Block) {
+        for i in 0..PASTA_T {
+            let s = add_mod(l[i], r[i], self.p);
+            l[i] = add_mod(l[i], s, self.p);
+            r[i] = add_mod(r[i], s, self.p);
         }
-        out
+    }
+
+    fn linear_layer(&mut self, state: &mut Block) {
+        let mat = self.rand_matrix();
+        let mut new = [0u64; PASTA_T];
+        for i in 0..PASTA_T {
+            for j in 0..PASTA_T {
+                new[i] = add_mod(new[i], mul_mod(mat[i][j], state[j], self.p), self.p);
+            }
+        }
+        *state = new;
+        let rc = self.rand_vec(true);
+        for i in 0..PASTA_T {
+            state[i] = add_mod(state[i], rc[i], self.p);
+        }
     }
 
     fn init_shake(&mut self, nonce: u64, block_counter: u64) {
@@ -191,13 +173,68 @@ impl Pasta {
             .map(|_| self.rand_field_element(allow_zero))
             .collect()
     }
+
+    fn rand_matrix(&mut self) -> Vec<Vec<u64>> {
+        let first_row = self.rand_vec(false);
+        let mut mat: Vec<Vec<u64>> = Vec::with_capacity(PASTA_T);
+        mat.push(first_row);
+
+        for i in 1..PASTA_T {
+            let next = self.calculate_row(&mat[i - 1], &mat[0]);
+            mat.push(next);
+        }
+
+        mat
+    }
+
+    fn calculate_row(&self, prev_row: &Vec<u64>, first_row: &Vec<u64>) -> Vec<u64> {
+        debug_assert_eq!(prev_row.len(), PASTA_T);
+        debug_assert_eq!(first_row.len(), PASTA_T);
+
+        let m = self.p as u128;
+
+        (0..PASTA_T)
+            .map(|j| {
+                let mut tmp = (first_row[j] as u128 * prev_row[PASTA_T - 1] as u128) % m;
+                if j != 0 {
+                    tmp = (tmp + prev_row[j - 1] as u128) % m;
+                }
+
+                tmp as u64
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use rand::{Rng, rng};
     use std::io::Read;
 
     use super::*;
+
+    const P: u64 = 65_537;
+
+    fn demo_key() -> Vec<u64> {
+        let mut rng = rng();
+        (0..2 * PASTA_T).map(|_| rng.random_range(0..P)).collect()
+    }
+
+    #[test]
+    fn roundtrip() {
+        let mut rng = rng();
+        let key = demo_key();
+        let mut pasta = Pasta::new(key, P);
+
+        let plain: Vec<u64> = (0..500).map(|_| rng.random_range(0..P)).collect();
+        println!("{:?}", plain);
+        let ct = pasta.encrypt(&plain);
+        println!("{:?}", ct);
+        let dec = pasta.decrypt(&ct);
+        println!("{:?}", dec);
+
+        assert_eq!(plain, dec);
+    }
 
     #[test]
     fn test_init_shake() {
@@ -247,5 +284,17 @@ mod tests {
         println!("{:?}", fp);
         let fp = pasta.rand_vec(true);
         println!("{:?}", fp);
+    }
+
+    #[test]
+    fn test_rand_matrix() {
+        let mut pasta = Pasta::new(vec![1, 2, 3, 4], 100);
+        pasta.init_shake(123456789, 0);
+        let m = pasta.rand_matrix();
+        println!("{:?}", m);
+        let m = pasta.rand_matrix();
+        println!("{:?}", m);
+        let m = pasta.rand_matrix();
+        println!("{:?}", m);
     }
 }

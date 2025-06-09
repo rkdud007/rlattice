@@ -36,6 +36,20 @@ pub struct Pasta {
 }
 
 impl Pasta {
+    /// im not sure if this consider secure PRF, but here is what we could output n length of integers(mod p)
+    /// by leveraging keystream function of Pasta
+    pub fn prf(&mut self, nonce: u64, n: usize) -> Vec<u64> {
+        let mut ctr = 0u64;
+        let mut out = Vec::with_capacity(n);
+        while out.len() < n {
+            let ks = self.keystream(nonce, ctr);
+            out.extend_from_slice(&ks);
+            ctr += 1;
+        }
+        out.truncate(n);
+        out
+    }
+
     pub fn new(key: Vec<u64>, modulus: u64) -> Self {
         let reader = Shake128::default().finalize_xof();
         let bits = 64 - modulus.leading_zeros();

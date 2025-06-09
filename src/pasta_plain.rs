@@ -216,6 +216,10 @@ mod tests {
     const P: u64 = 65_537;
 
     fn demo_key() -> Vec<u64> {
+        (0..2 * PASTA_T).map(|i| (i * 17) as u64 % P).collect()
+    }
+
+    fn rand_demo_key() -> Vec<u64> {
         let mut rng = rng();
         (0..2 * PASTA_T).map(|_| rng.random_range(0..P)).collect()
     }
@@ -223,7 +227,7 @@ mod tests {
     #[test]
     fn roundtrip() {
         let mut rng = rng();
-        let key = demo_key();
+        let key = rand_demo_key();
         let mut pasta = Pasta::new(key, P);
 
         let plain: Vec<u64> = (0..500).map(|_| rng.random_range(0..P)).collect();
@@ -256,6 +260,19 @@ mod tests {
         let mut buf = [0u8; 8];
         f.read(&mut buf).unwrap();
         println!("{:?}", buf);
+    }
+
+    #[test]
+    fn test_keystream() {
+        let mut pasta = Pasta::new(demo_key(), P);
+        let ks = pasta.keystream(123456789, 0);
+        println!("{:?}", ks);
+
+        let ks = pasta.keystream(123456789, 1);
+        println!("{:?}", ks);
+
+        let ks = pasta.keystream(123456789, 2);
+        println!("{:?}", ks);
     }
 
     #[test]

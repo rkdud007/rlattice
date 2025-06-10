@@ -10,7 +10,7 @@ use sha3::{
 };
 
 /// Plaintext size
-pub const PASTA_T: usize = 128;
+pub const PASTA_T: usize = 1;
 /// Round count
 pub const PASTA_R: usize = 3;
 
@@ -74,6 +74,7 @@ impl Pasta {
         }
         out
     }
+    
     pub fn decrypt(&mut self, ciphertext: &[u64]) -> Vec<u64> {
         let n_blocks = (ciphertext.len() + PASTA_T - 1) / PASTA_T;
         let mut out = ciphertext.to_vec();

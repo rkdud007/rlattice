@@ -7,7 +7,7 @@
 //! n = ring dimension
 
 use crate::polynomial::{Element, Polynomial};
-use std::ops::Add;
+use std::ops::{Add, Mul};
 
 pub struct Bfv<const N: usize, const Q: u64, const T: u64> {
     pk: (Polynomial<N, Q>, Polynomial<N, Q>),
@@ -80,6 +80,18 @@ impl<const N: usize, const Q: u64, const T: u64> Add for BfvCipher<N, Q, T> {
         let c_1 = self.c_1 + rhs.c_1;
         let c_2 = self.c_2 + rhs.c_2;
         Self { c_1, c_2 }
+    }
+}
+
+/// plaintext * ciphertext
+impl<const N: usize, const Q: u64, const T: u64> Mul<Polynomial<N, Q>> for &BfvCipher<N, Q, T> {
+    type Output = BfvCipher<N, Q, T>;
+
+    fn mul(self, pt: Polynomial<N, Q>) -> Self::Output {
+        let c0 = self.c_1 * pt;
+        let c1 = self.c_2 * pt;
+
+        BfvCipher { c_1: c0, c_2: c1 }
     }
 }
 

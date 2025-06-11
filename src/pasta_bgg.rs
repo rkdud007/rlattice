@@ -1,3 +1,9 @@
+//! Attempt to implement Pasta homomorphically over bgg.
+//! But while realized I need to hide the Pasta key by fhe ciphertext which is PRF key in our context.
+//! Will back with this after try simple bgg/bfv experiments.
+//!
+//! Also unlike plain this logic is incorrect.
+
 use byteorder::{BigEndian, ByteOrder};
 use diamond_io::poly::PolyElem;
 use diamond_io::{
@@ -219,7 +225,7 @@ mod tests {
         let enc_right = encs[2].clone();
         println!("sampled bgg");
 
-        let ks0 = keystream_bgg(&params, &enc_left, &enc_right, &enc_one, 0, 0);
+        let _ = keystream_bgg(&params, &enc_left, &enc_right, &enc_one, 0, 0);
         // let ks1 = keystream_bgg(&params, &enc_left, &enc_right, &enc_one, 0, 1);
         println!("sampled ks0");
         // assert_ne!(ks0.vector, ks1.vector);
